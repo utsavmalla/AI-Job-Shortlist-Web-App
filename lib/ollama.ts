@@ -1,9 +1,15 @@
 import { AppError } from "./errors";
 import { buildExtractionPrompt } from "./extraction-prompt";
+import {
+  classifyOllamaHttpError,
+  getOllamaGenerateUrl,
+  getOllamaHeaders,
+  getOllamaModel,
+  getOllamaModelNotFoundMessage,
+  getOllamaUnavailableMessage,
+} from "./ollama-config";
 import { jobRequirementsSchema } from "./schema";
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:11434";
-const DEFAULT_MODEL = "qwen3:8b";
 const TIMEOUT_MS = 60_000;
 
 const responseSchema = {
@@ -33,26 +39,15 @@ const responseSchema = {
 
 type OllamaResponse = { response?: string; error?: string };
 
-function getGenerateUrl() {
-  const configuredUrl = process.env.OLLAMA_BASE_URL?.trim() || DEFAULT_BASE_URL;
-  try {
-    const baseUrl = new URL(configuredUrl);
-    if (baseUrl.protocol !== "http:" && baseUrl.protocol !== "https:") throw new Error("Unsupported protocol");
-    return new URL("api/generate", `${baseUrl.toString().replace(/\/$/, "")}/`).toString();
-  } catch {
-    throw new AppError("OLLAMA_BASE_URL is invalid. Use a URL such as http://127.0.0.1:11434.", 503, "INVALID_OLLAMA_URL");
-  }
-}
-
 export async function extractWithOllama(content: string) {
-  const model = process.env.OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
+  const model = getOllamaModel();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch(getGenerateUrl(), {
+    const response = await fetch(getOllamaGenerateUrl(), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getOllamaHeaders(),
       body: JSON.stringify({
         model,
         prompt: buildExtractionPrompt(content),
@@ -67,9 +62,9 @@ export async function extractWithOllama(content: string) {
     const body = await response.json().catch(() => null) as OllamaResponse | null;
     if (!response.ok) {
       if (response.status === 404 || /model.+not found/i.test(body?.error ?? "")) {
-        throw new AppError(`Ollama model ${model} is not installed. Run: ollama pull ${model}`, 503, "OLLAMA_MODEL_NOT_FOUND");
+        throw new AppError(getOllamaModelNotFoundMessage(model), 503, "OLLAMA_MODEL_NOT_FOUND");
       }
-      throw new AppError("Ollama could not process this job description. Make sure the local model is available.", 502, "OLLAMA_ERROR");
+      throw classifyOllamaHttpError(response.status, model, "process this job description");
     }
 
     if (typeof body?.response !== "string") {
@@ -91,7 +86,7 @@ export async function extractWithOllama(content: string) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new AppError("Ollama took too long to respond. Please try again.", 504, "MODEL_TIMEOUT");
     }
-    throw new AppError("Cannot connect to Ollama. Start the Ollama desktop app and try again.", 503, "OLLAMA_UNAVAILABLE");
+    throw new AppError(getOllamaUnavailableMessage(), 503, "OLLAMA_UNAVAILABLE");
   } finally {
     clearTimeout(timeout);
   }

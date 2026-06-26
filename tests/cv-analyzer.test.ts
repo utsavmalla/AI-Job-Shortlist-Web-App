@@ -22,6 +22,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.OLLAMA_BASE_URL;
   delete process.env.OLLAMA_MODEL;
+  delete process.env.OLLAMA_API_KEY;
 });
 
 describe("local CV analysis", () => {
@@ -35,9 +36,30 @@ describe("local CV analysis", () => {
   it("returns validated structured output from Ollama", async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ response: JSON.stringify(validResult) })));
     await expect(analyzeCvWithOllama("CV text", ["skills", "clarity"], null)).resolves.toEqual(validResult);
-    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body));
+    const request = vi.mocked(fetch).mock.calls[0]?.[1];
+    const body = JSON.parse(String(request?.body));
     expect(body).toMatchObject({ model: "qwen3:8b", stream: false, think: false, options: { temperature: 0 } });
     expect(body.format.additionalProperties).toBe(false);
+    expect(request?.headers).toEqual({ "Content-Type": "application/json" });
+  });
+
+  it("supports Ollama Cloud API keys and cloud model names", async () => {
+    process.env.OLLAMA_BASE_URL = "https://ollama.com";
+    process.env.OLLAMA_MODEL = "gpt-oss:20b";
+    process.env.OLLAMA_API_KEY = "test-ollama-key";
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ response: JSON.stringify(validResult) })));
+
+    await expect(analyzeCvWithOllama("CV text", ["skills", "clarity"], null)).resolves.toEqual(validResult);
+    expect(fetch).toHaveBeenCalledWith("https://ollama.com/api/generate", expect.objectContaining({
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-ollama-key",
+      },
+      method: "POST",
+    }));
+
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body));
+    expect(body.model).toBe("gpt-oss:20b");
   });
 
   it("rejects out-of-range scores and mismatched criteria", async () => {
@@ -54,5 +76,17 @@ describe("local CV analysis", () => {
 
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ error: "model not found" }), { status: 404 }));
     await expect(analyzeCvWithOllama("CV", ["skills"], null)).rejects.toMatchObject({ code: "OLLAMA_MODEL_NOT_FOUND" });
+  });
+
+  it("reports cloud model access denial clearly", async () => {
+    process.env.OLLAMA_BASE_URL = "https://ollama.com";
+    process.env.OLLAMA_MODEL = "qwen3.5:cloud";
+    process.env.OLLAMA_API_KEY = "test-ollama-key";
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }));
+
+    await expect(analyzeCvWithOllama("CV", ["skills"], null)).rejects.toMatchObject({
+      code: "OLLAMA_MODEL_ACCESS_DENIED",
+      status: 503,
+    });
   });
 });

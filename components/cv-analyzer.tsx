@@ -95,7 +95,7 @@ export function CvAnalyzer() {
       const payload = await readApiPayload(response);
       if (!response.ok) throw new Error((payload as ApiError).error ?? "CV analysis failed.");
       setData(payload as ApiResponse);
-      requestAnimationFrame(() => document.getElementById("cv-results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      requestAnimationFrame(() => document.getElementById("cv-results")?.scrollIntoView?.({ behavior: "smooth", block: "start" }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "CV analysis failed. Please try again.");
     } finally {

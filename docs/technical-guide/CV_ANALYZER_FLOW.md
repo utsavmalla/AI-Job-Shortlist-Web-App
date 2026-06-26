@@ -212,13 +212,15 @@ CV analysis always calls Ollama and never falls back to Gemini. Configuration is
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama server base URL. |
-| `OLLAMA_MODEL` | `qwen3:8b` | Local model used for CV analysis. |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama server base URL. Use `https://ollama.com` for Ollama Cloud. |
+| `OLLAMA_MODEL` | `qwen3:8b` | Ollama model used for CV analysis. Use `gpt-oss:20b` for Ollama Cloud. |
+| `OLLAMA_API_KEY` | unset | Server-only bearer token for Ollama Cloud; leave unset for local Ollama. |
 
 The server calls:
 
 ```http
 POST {OLLAMA_BASE_URL}/api/generate
+Authorization: Bearer {OLLAMA_API_KEY} # only when configured
 Content-Type: application/json
 ```
 

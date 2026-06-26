@@ -35,12 +35,21 @@ Environment variables:
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `AI_PROVIDER` | No | Job extraction provider: `gemini` (default) or `ollama`. CV analysis ignores this and always uses Ollama. |
-| `OLLAMA_BASE_URL` | No | Local Ollama base URL; defaults to `http://127.0.0.1:11434`. |
-| `OLLAMA_MODEL` | No | Ollama model; defaults to `qwen3:8b`. |
+| `OLLAMA_BASE_URL` | No | Ollama base URL; defaults to local `http://127.0.0.1:11434`. Use `https://ollama.com` for Ollama Cloud. |
+| `OLLAMA_MODEL` | No | Ollama model; defaults to local `qwen3:8b`. Use a cloud model such as `gpt-oss:20b` with Ollama Cloud. |
+| `OLLAMA_API_KEY` | For Ollama Cloud | Server-only bearer token for `https://ollama.com`; leave unset for local Ollama. |
 | `GEMINI_API_KEY` | When using Gemini | Server-only credential used by the Gemini SDK. |
 | `GEMINI_MODEL` | No | Overrides the default `gemini-2.5-flash-lite` model. |
 
 Never prefix these variables with `NEXT_PUBLIC_`. `.env.local` is ignored by Git; `.env.example` documents placeholders only.
+
+For hosted deployments using Ollama Cloud, set:
+
+```bash
+OLLAMA_BASE_URL=https://ollama.com
+OLLAMA_MODEL=gpt-oss:20b
+OLLAMA_API_KEY=your_ollama_api_key
+```
 
 ## Architecture
 
@@ -164,6 +173,7 @@ The response contains the original file name and a strict analysis result with a
 - Raw provider errors are classified into safe `AppError` messages. Unknown provider errors are logged after API-key query parameters are redacted.
 - Never send credentials, raw provider responses, internal prompts, or stack traces to the client.
 - CV analysis never falls back to Gemini, even when `AI_PROVIDER=gemini`.
+- Ollama Cloud credentials are sent only from server modules as an `Authorization` header when `OLLAMA_API_KEY` is configured.
 - Uploaded CV bytes and extracted text are held only for the request and are not written to disk or persisted.
 
 ### Untrusted content and model output

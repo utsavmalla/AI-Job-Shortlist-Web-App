@@ -24,6 +24,15 @@ GEMINI_MODEL=gemini-2.5-flash-lite
 
 Use server-only variable names. Do not prefix secrets with `NEXT_PUBLIC_`.
 
+For Ollama Cloud instead of a local host service, use deployment secrets:
+
+```bash
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=https://ollama.com
+OLLAMA_MODEL=gpt-oss:20b
+OLLAMA_API_KEY=your_ollama_api_key
+```
+
 ## Run
 
 ```bash
@@ -44,6 +53,11 @@ OLLAMA_BASE_URL=http://host.docker.internal:11434
 
 # A managed or private network Ollama service
 OLLAMA_BASE_URL=http://ollama.example.internal:11434
+
+# Ollama Cloud
+OLLAMA_BASE_URL=https://ollama.com
+OLLAMA_MODEL=gpt-oss:20b
+OLLAMA_API_KEY=your_ollama_api_key
 ```
 
 If you set `AI_PROVIDER=gemini`, job extraction can use Gemini, but CV analysis still requires Ollama.
