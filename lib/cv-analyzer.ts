@@ -1,4 +1,5 @@
 import { AppError } from "./errors";
+import { logExternalRequestEnd, logExternalRequestFailure, logExternalRequestStart } from "./external-request-logger";
 import {
   classifyOllamaHttpError,
   getOllamaGenerateUrl,
@@ -63,11 +64,14 @@ function validateSelectedCriteria(result: CvAnalysis, guidelines: CvGuideline[])
 
 export async function analyzeCvWithOllama(cvText: string, guidelines: CvGuideline[], jobText: string | null) {
   const model = getOllamaModel();
+  const url = getOllamaGenerateUrl();
+  const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  logExternalRequestStart({ provider: "Ollama", action: "CV analysis", method: "POST", url, model, timeoutMs: TIMEOUT_MS });
 
   try {
-    const response = await fetch(getOllamaGenerateUrl(), {
+    const response = await fetch(url, {
       method: "POST",
       headers: getOllamaHeaders(),
       body: JSON.stringify({
@@ -81,6 +85,18 @@ export async function analyzeCvWithOllama(cvText: string, guidelines: CvGuidelin
       signal: controller.signal,
     });
     const body = await response.json().catch(() => null) as OllamaResponse | null;
+    logExternalRequestEnd({
+      provider: "Ollama",
+      action: "CV analysis",
+      method: "POST",
+      url,
+      model,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+      timeoutMs: TIMEOUT_MS,
+      contentType: response.headers.get("content-type"),
+      contentLength: response.headers.get("content-length"),
+    });
     if (!response.ok) {
       if (response.status === 404 || /model.+not found/i.test(body?.error ?? "")) {
         throw new AppError(getOllamaModelNotFoundMessage(model), 503, "OLLAMA_MODEL_NOT_FOUND");
@@ -104,8 +120,30 @@ export async function analyzeCvWithOllama(cvText: string, guidelines: CvGuidelin
   } catch (error) {
     if (error instanceof AppError) throw error;
     if (error instanceof Error && error.name === "AbortError") {
-      throw new AppError("Ollama took too long to analyze the CV. Please try again.", 504, "MODEL_TIMEOUT");
+      const appError = new AppError("Ollama took too long to analyze the CV. Please try again.", 504, "MODEL_TIMEOUT");
+      logExternalRequestFailure({
+        provider: "Ollama",
+        action: "CV analysis",
+        method: "POST",
+        url,
+        model,
+        durationMs: Date.now() - startedAt,
+        timeoutMs: TIMEOUT_MS,
+        error: appError,
+      });
+      throw appError;
     }
+    logExternalRequestFailure({
+      provider: "Ollama",
+      action: "CV analysis",
+      method: "POST",
+      url,
+      model,
+      durationMs: Date.now() - startedAt,
+      timeoutMs: TIMEOUT_MS,
+      errorCode: "OLLAMA_UNAVAILABLE",
+      error,
+    });
     throw new AppError(getOllamaUnavailableMessage(), 503, "OLLAMA_UNAVAILABLE");
   } finally {
     clearTimeout(timeout);

@@ -10,6 +10,7 @@ The snippets are intentionally small enough for an interview discussion. In the 
 - [Node.js — Questions 13–22](#nodejs--questions-1322)
 - [React — Questions 23–26](#react--questions-2326)
 - [Next.js — Questions 27–30](#nextjs--questions-2730)
+- [Senior TypeScript Key Concepts Interview Questions](typescript-key-concepts-interview-questions.md)
 
 ## TypeScript — Questions 1–12
 
@@ -791,6 +792,7 @@ type ErrorResponse = {
 
 ## Related Project References
 
+- [Senior TypeScript Key Concepts Interview Questions](typescript-key-concepts-interview-questions.md)
 - [Developer Guide](DEVELOPER_GUIDE.md)
 - [CV Analyzer Technical Flow](technical-guide/CV_ANALYZER_FLOW.md)
 - [`lib/schema.ts`](../lib/schema.ts)

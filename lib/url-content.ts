@@ -2,6 +2,7 @@ import dns from "node:dns/promises";
 import { isIP } from "node:net";
 import * as cheerio from "cheerio";
 import { AppError } from "./errors";
+import { logExternalRequestEnd, logExternalRequestFailure, logExternalRequestStart } from "./external-request-logger";
 
 const FETCH_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 1_500_000;
@@ -47,13 +48,39 @@ export async function assertPublicUrl(rawUrl: string) {
 }
 
 async function fetchPage(url: URL, redirects = 0): Promise<Response> {
+  const startedAt = Date.now();
+  logExternalRequestStart({ provider: "Job URL", action: "page fetch", method: "GET", url, redirectCount: redirects, timeoutMs: FETCH_TIMEOUT_MS });
   const response = await fetch(url, {
     redirect: "manual",
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: { "User-Agent": "JobRequirementsExtractor/1.0", Accept: "text/html,application/xhtml+xml" },
   }).catch((error: unknown) => {
-    if (error instanceof DOMException && error.name === "TimeoutError") throw new AppError("The job page took too long to respond. Paste the job description instead.", 504, "FETCH_TIMEOUT");
-    throw new AppError("This site blocked or failed retrieval. Paste the job description instead.", 422, "FETCH_FAILED");
+    const appError = error instanceof DOMException && error.name === "TimeoutError"
+      ? new AppError("The job page took too long to respond. Paste the job description instead.", 504, "FETCH_TIMEOUT")
+      : new AppError("This site blocked or failed retrieval. Paste the job description instead.", 422, "FETCH_FAILED");
+    logExternalRequestFailure({
+      provider: "Job URL",
+      action: "page fetch",
+      method: "GET",
+      url,
+      redirectCount: redirects,
+      durationMs: Date.now() - startedAt,
+      timeoutMs: FETCH_TIMEOUT_MS,
+      error: appError,
+    });
+    throw appError;
+  });
+  logExternalRequestEnd({
+    provider: "Job URL",
+    action: "page fetch",
+    method: "GET",
+    url,
+    redirectCount: redirects,
+    status: response.status,
+    durationMs: Date.now() - startedAt,
+    timeoutMs: FETCH_TIMEOUT_MS,
+    contentType: response.headers.get("content-type"),
+    contentLength: response.headers.get("content-length"),
   });
   if (response.status >= 300 && response.status < 400) {
     if (redirects >= MAX_REDIRECTS) throw new AppError("The job page redirected too many times.", 422, "FETCH_FAILED");

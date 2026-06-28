@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai";
 import { AppError } from "./errors";
 import { buildExtractionPrompt } from "./extraction-prompt";
+import { logExternalRequestEnd, logExternalRequestFailure, logExternalRequestStart } from "./external-request-logger";
 import { jobRequirementsSchema } from "./schema";
 
 const DEFAULT_MODEL = "gemini-2.5-flash-lite";
@@ -90,15 +91,42 @@ export async function extractWithGemini(content: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new AppError("Gemini is not configured. Add GEMINI_API_KEY to the server environment.", 503, "MISSING_API_KEY");
   const modelName = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`;
+  const startedAt = Date.now();
   const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: "application/json", responseSchema } });
   const prompt = buildExtractionPrompt(content);
+  let externalResponseReceived = false;
+  logExternalRequestStart({ provider: "Gemini", action: "job extraction", method: "POST", url, model: modelName, timeoutMs: TIMEOUT_MS });
   try {
     const result = await withTimeout(model.generateContent(prompt));
+    externalResponseReceived = true;
+    logExternalRequestEnd({
+      provider: "Gemini",
+      action: "job extraction",
+      method: "POST",
+      url,
+      model: modelName,
+      durationMs: Date.now() - startedAt,
+      timeoutMs: TIMEOUT_MS,
+    });
     const parsed = JSON.parse(result.response.text());
     const validated = jobRequirementsSchema.safeParse(parsed);
     if (!validated.success) throw new AppError("Gemini returned an invalid result. Please try again.", 502, "INVALID_MODEL_OUTPUT");
     return validated.data;
   } catch (error) {
-    throw classifyGeminiError(error);
+    const appError = classifyGeminiError(error);
+    if (!externalResponseReceived) {
+      logExternalRequestFailure({
+        provider: "Gemini",
+        action: "job extraction",
+        method: "POST",
+        url,
+        model: modelName,
+        durationMs: Date.now() - startedAt,
+        timeoutMs: TIMEOUT_MS,
+        error: appError,
+      });
+    }
+    throw appError;
   }
 }

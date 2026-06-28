@@ -40,6 +40,7 @@ Environment variables:
 | `OLLAMA_API_KEY` | For Ollama Cloud | Server-only bearer token for `https://ollama.com`; leave unset for local Ollama. |
 | `GEMINI_API_KEY` | When using Gemini | Server-only credential used by the Gemini SDK. |
 | `GEMINI_MODEL` | No | Overrides the default `gemini-2.5-flash-lite` model. |
+| `EXTERNAL_REQUEST_DEBUG` | No | Set to `true` for detailed backend metadata logs for outbound job-page, Ollama, and Gemini requests. Prompts, CV text, job text, API keys, and provider response bodies are not logged. |
 
 Never prefix these variables with `NEXT_PUBLIC_`. `.env.local` is ignored by Git; `.env.example` documents placeholders only.
 
@@ -171,6 +172,7 @@ The response contains the original file name and a strict analysis result with a
 
 - Gemini credentials are read only in `lib/gemini.ts`, which is reached through the server route.
 - Raw provider errors are classified into safe `AppError` messages. Unknown provider errors are logged after API-key query parameters are redacted.
+- Outbound requests always emit simple backend lifecycle logs. `EXTERNAL_REQUEST_DEBUG=true` adds sanitized metadata only; never log prompts, CV text, job text, credentials, or provider response bodies.
 - Never send credentials, raw provider responses, internal prompts, or stack traces to the client.
 - CV analysis never falls back to Gemini, even when `AI_PROVIDER=gemini`.
 - Ollama Cloud credentials are sent only from server modules as an `Authorization` header when `OLLAMA_API_KEY` is configured.
