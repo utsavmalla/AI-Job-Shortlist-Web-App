@@ -15,10 +15,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   delete process.env.OLLAMA_BASE_URL;
   delete process.env.OLLAMA_MODEL;
   delete process.env.OLLAMA_API_KEY;
+  delete process.env.EXTERNAL_REQUEST_PROMPT_DEBUG;
 });
 
 describe("Ollama extraction", () => {
@@ -52,6 +54,24 @@ describe("Ollama extraction", () => {
 
     const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body));
     expect(body.model).toBe("gpt-oss:20b");
+  });
+
+  it("logs the exact extraction prompt when prompt debug is enabled", async () => {
+    process.env.EXTERNAL_REQUEST_PROMPT_DEBUG = "true";
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ response: JSON.stringify(validResult) })));
+
+    await expect(extractWithOllama("React role")).resolves.toEqual(validResult);
+
+    expect(info).toHaveBeenCalledWith(
+      "External request prompt: Ollama job extraction",
+      expect.objectContaining({
+        provider: "Ollama",
+        action: "job extraction",
+        model: "qwen3:8b",
+        prompt: expect.stringContaining("UNTRUSTED JOB CONTENT START\nReact role\nUNTRUSTED JOB CONTENT END"),
+      }),
+    );
   });
 
   it("rejects malformed JSON and model-added fields", async () => {

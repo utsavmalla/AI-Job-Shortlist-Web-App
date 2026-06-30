@@ -1,6 +1,6 @@
 import { AppError } from "./errors";
 import { buildExtractionPrompt } from "./extraction-prompt";
-import { logExternalRequestEnd, logExternalRequestFailure, logExternalRequestStart } from "./external-request-logger";
+import { logExternalRequestEnd, logExternalRequestFailure, logExternalRequestPrompt, logExternalRequestStart } from "./external-request-logger";
 import {
   classifyOllamaHttpError,
   getOllamaGenerateUrl,
@@ -46,7 +46,9 @@ export async function extractWithOllama(content: string) {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const prompt = buildExtractionPrompt(content);
   logExternalRequestStart({ provider: "Ollama", action: "job extraction", method: "POST", url, model, timeoutMs: TIMEOUT_MS });
+  logExternalRequestPrompt({ provider: "Ollama", action: "job extraction", model, prompt });
 
   try {
     const response = await fetch(url, {
@@ -54,7 +56,7 @@ export async function extractWithOllama(content: string) {
       headers: getOllamaHeaders(),
       body: JSON.stringify({
         model,
-        prompt: buildExtractionPrompt(content),
+        prompt,
         stream: false,
         think: false,
         format: responseSchema,

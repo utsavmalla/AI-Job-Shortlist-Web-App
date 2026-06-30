@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai";
 import { AppError } from "./errors";
 import { buildExtractionPrompt } from "./extraction-prompt";
-import { logExternalRequestEnd, logExternalRequestFailure, logExternalRequestStart } from "./external-request-logger";
+import { logExternalRequestEnd, logExternalRequestFailure, logExternalRequestPrompt, logExternalRequestStart } from "./external-request-logger";
 import { jobRequirementsSchema } from "./schema";
 
 const DEFAULT_MODEL = "gemini-2.5-flash-lite";
@@ -97,6 +97,7 @@ export async function extractWithGemini(content: string) {
   const prompt = buildExtractionPrompt(content);
   let externalResponseReceived = false;
   logExternalRequestStart({ provider: "Gemini", action: "job extraction", method: "POST", url, model: modelName, timeoutMs: TIMEOUT_MS });
+  logExternalRequestPrompt({ provider: "Gemini", action: "job extraction", model: modelName, prompt });
   try {
     const result = await withTimeout(model.generateContent(prompt));
     externalResponseReceived = true;

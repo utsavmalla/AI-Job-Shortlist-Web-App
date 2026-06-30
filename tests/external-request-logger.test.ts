@@ -3,12 +3,14 @@ import { AppError } from "@/lib/errors";
 import {
   logExternalRequestEnd,
   logExternalRequestFailure,
+  logExternalRequestPrompt,
   logExternalRequestStart,
 } from "@/lib/external-request-logger";
 
 afterEach(() => {
   vi.restoreAllMocks();
   delete process.env.EXTERNAL_REQUEST_DEBUG;
+  delete process.env.EXTERNAL_REQUEST_PROMPT_DEBUG;
 });
 
 describe("external request logger", () => {
@@ -86,5 +88,52 @@ describe("external request logger", () => {
     );
     expect(JSON.stringify(warn.mock.calls)).not.toContain("Provider message");
     expect(JSON.stringify(warn.mock.calls)).not.toContain("secret");
+  });
+
+  it("does not log prompts by default", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    logExternalRequestPrompt({
+      provider: "Ollama",
+      action: "job extraction",
+      model: "qwen3:8b",
+      prompt: "UNTRUSTED JOB CONTENT START\nprivate job text\nUNTRUSTED JOB CONTENT END",
+    });
+
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it("keeps prompt logs disabled when only metadata debug is enabled", () => {
+    process.env.EXTERNAL_REQUEST_DEBUG = "true";
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    logExternalRequestPrompt({
+      provider: "Gemini",
+      action: "job extraction",
+      model: "gemini-2.5-flash-lite",
+      prompt: "exact prompt",
+    });
+
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it("logs the exact prompt when prompt debug is enabled", () => {
+    process.env.EXTERNAL_REQUEST_PROMPT_DEBUG = "true";
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const prompt = "UNTRUSTED CV CONTENT START\nPrivate CV text\nUNTRUSTED CV CONTENT END";
+
+    logExternalRequestPrompt({
+      provider: "Ollama",
+      action: "CV analysis",
+      model: "qwen3:8b",
+      prompt,
+    });
+
+    expect(info).toHaveBeenCalledWith("External request prompt: Ollama CV analysis", {
+      provider: "Ollama",
+      action: "CV analysis",
+      model: "qwen3:8b",
+      prompt,
+    });
   });
 });

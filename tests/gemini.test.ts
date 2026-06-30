@@ -30,9 +30,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   delete process.env.GEMINI_API_KEY;
   delete process.env.GEMINI_MODEL;
+  delete process.env.EXTERNAL_REQUEST_PROMPT_DEBUG;
 });
 
 describe("Gemini extraction", () => {
@@ -47,6 +49,24 @@ describe("Gemini extraction", () => {
     mocks.generateContent.mockResolvedValue({ response: { text: () => JSON.stringify(validResult) } });
     await extractWithGemini("React role");
     expect(mocks.getGenerativeModel).toHaveBeenCalledWith(expect.objectContaining({ model: "gemini-custom" }));
+  });
+
+  it("logs the exact extraction prompt when prompt debug is enabled", async () => {
+    process.env.EXTERNAL_REQUEST_PROMPT_DEBUG = "true";
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    mocks.generateContent.mockResolvedValue({ response: { text: () => JSON.stringify(validResult) } });
+
+    await expect(extractWithGemini("React role")).resolves.toEqual(validResult);
+
+    expect(info).toHaveBeenCalledWith(
+      "External request prompt: Gemini job extraction",
+      expect.objectContaining({
+        provider: "Gemini",
+        action: "job extraction",
+        model: "gemini-2.5-flash-lite",
+        prompt: expect.stringContaining("UNTRUSTED JOB CONTENT START\nReact role\nUNTRUSTED JOB CONTENT END"),
+      }),
+    );
   });
 
   it("rejects malformed JSON and model-added fields", async () => {

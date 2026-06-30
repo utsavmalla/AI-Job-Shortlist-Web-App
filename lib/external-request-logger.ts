@@ -15,8 +15,19 @@ type ExternalRequestLogDetails = {
   url?: string | URL;
 };
 
+type ExternalRequestPromptLogDetails = {
+  action: string;
+  model?: string;
+  prompt: string;
+  provider: string;
+};
+
 function isDebugEnabled() {
   return process.env.EXTERNAL_REQUEST_DEBUG?.trim().toLowerCase() === "true";
+}
+
+export function isPromptDebugEnabled() {
+  return process.env.EXTERNAL_REQUEST_PROMPT_DEBUG?.trim().toLowerCase() === "true";
 }
 
 function sanitizeUrl(url: string | URL | undefined) {
@@ -67,6 +78,16 @@ export function getExternalRequestErrorCode(error: unknown) {
 
 export function logExternalRequestStart(details: ExternalRequestLogDetails) {
   logInfo("started", details);
+}
+
+export function logExternalRequestPrompt(details: ExternalRequestPromptLogDetails) {
+  if (!isPromptDebugEnabled()) return;
+  console.info(`External request prompt: ${details.provider} ${details.action}`, {
+    provider: details.provider,
+    action: details.action,
+    model: details.model ?? null,
+    prompt: details.prompt,
+  });
 }
 
 export function logExternalRequestEnd(details: ExternalRequestLogDetails) {

@@ -2,7 +2,7 @@
 
 A small Next.js app that turns pasted job descriptions or public job-page URLs into structured requirements using local Ollama or Gemini.
 
-Contributor setup, architecture, API contracts, security constraints, and development workflows are documented in the [Developer Guide](docs/DEVELOPER_GUIDE.md).
+Contributor setup, architecture, API contracts, security constraints, and development workflows are documented in the [Developer Guide](docs/DEVELOPER_GUIDE.md). Docker Hub and Render deployment steps are documented in the [Deployment Guide](docs/DEPLOYMENT.md).
 
 ## Run locally
 
@@ -12,6 +12,10 @@ Contributor setup, architecture, API contracts, security constraints, and develo
 4. Run `npm run dev` and open `http://localhost:3000`.
 
 Provider configuration and API keys are read only on the server and are never included in browser code. Submitted content and results are not persisted. Ollama failures are reported locally and do not fall back to Gemini.
+
+## Deploy
+
+The app includes a standalone Next.js Dockerfile. Build and publish the image to Docker Hub, then run it on Render with Ollama Cloud environment variables. See the [Deployment Guide](docs/DEPLOYMENT.md) for exact commands and Render settings.
 
 ## API
 
